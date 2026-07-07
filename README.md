@@ -38,6 +38,15 @@ cargo test --all
 
 Deployed to Stellar Testnet during development, promoted to Mainnet at release. See the deployment script under `scripts/` (once added) and [ARCHITECTURE.md](ARCHITECTURE.md#deployment) for target details.
 
+### Testnet Addresses
+
+| Contract | Address |
+|---|---|
+| Org Registry | `CDQR5XCOVELSUKLEWSV2EKTS2P2DPBV5BVCKWEWAS2DZBFZJRGCBAF72` |
+| Payroll | `CD7Q6EOD7XOW2N7ASF3PZJ5QUKKSSGWBKQPUQUD6GLMAQRDXIO2WR54S` |
+| Vesting | `CDQWGKBSUVL2TORZMLDVWBDNI4QP366PFCG5LGYGZHCUEMJAADGPK72Y` |
+| Test USDC token | `CDLGHX4OJH65EA7CEMBDJCR5L5WCF2O65YMJYCDP2VQPGSXQVCIHMMLQ` |
+
 ## Related Repos
 
 - [backend](https://github.com/Disburse-Protocol/DP-Backend) — chain indexer and query API

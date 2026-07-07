@@ -1,10 +1,11 @@
 #![cfg(test)]
 
 use super::*;
-use soroban_sdk::Env;
+use soroban_sdk::{testutils::Address as _, Env};
 
 #[test]
 fn contract_registers() {
     let env = Env::default();
-    env.register(VestingContract, ());
+    let org_registry = Address::generate(&env);
+    env.register(VestingContract, (org_registry,));
 }

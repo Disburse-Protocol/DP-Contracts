@@ -22,7 +22,7 @@ Full system design, storage layout, contract interfaces, and cross-contract call
 ## Local Setup
 
 ```bash
-git clone https://github.com/stellarpay-protocol/contracts.git
+git clone https://github.com/Disburse-Protocol/DP-Contracts.git
 cd contracts
 rustup target add wasm32-unknown-unknown
 cargo build --target wasm32-unknown-unknown --release
@@ -40,8 +40,8 @@ Deployed to Stellar Testnet during development, promoted to Mainnet at release. 
 
 ## Related Repos
 
-- [backend](https://github.com/stellarpay-protocol/backend) — chain indexer and query API
-- [frontend](https://github.com/stellarpay-protocol/frontend) — employer dashboard and employee portal
+- [backend](https://github.com/Disburse-Protocol/DP-Backend) — chain indexer and query API
+- [frontend](https://github.com/Disburse-Protocol/DP-Frontend) — employer dashboard and employee portal
 
 ## Contributing
 

@@ -1,7 +1,7 @@
 #![cfg(test)]
 
 use super::*;
-use soroban_sdk::Env;
+use soroban_sdk::{testutils::Address as _, Env};
 
 #[test]
 fn contract_registers() {
@@ -9,7 +9,9 @@ fn contract_registers() {
     // Confirms the contract compiles and can be registered with the host.
     // Real coverage (schedules, batching, disbursement) is tracked as
     // Wave issues — see CONTRIBUTING.md.
-    env.register(PayrollContract, ());
+    let org_registry = Address::generate(&env);
+    let token = Address::generate(&env);
+    env.register(PayrollContract, (org_registry, token));
 }
 
 #[test]

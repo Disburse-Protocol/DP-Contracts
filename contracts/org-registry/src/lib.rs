@@ -1,8 +1,7 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contractclient, contracterror, contractimpl, contracttype, Address, Env, Symbol,
-    Vec,
+    contract, contractclient, contracterror, contractimpl, contracttype, Address, Env, Symbol, Vec,
 };
 
 /// Ledgers to extend persistent entries by on every write (~30 days at 5s/ledger).
@@ -69,7 +68,9 @@ impl OrgRegistryContract {
     /// only used to authorize wiring the Payroll contract address once, after
     /// deployment, via [`Self::set_payroll_contract`].
     pub fn __constructor(env: Env, super_admin: Address) {
-        env.storage().instance().set(&DataKey::SuperAdmin, &super_admin);
+        env.storage()
+            .instance()
+            .set(&DataKey::SuperAdmin, &super_admin);
     }
 
     /// One-time wiring of the deployed Payroll contract's address, used to
@@ -123,6 +124,11 @@ impl OrgRegistryContract {
             &DataKey::EmployeeList(next_id),
             TTL_THRESHOLD,
             TTL_EXTEND_TO,
+        );
+
+        env.events().publish(
+            (Symbol::new(&env, "OrgCreated"),),
+            (next_id, org.name.clone(), org.admin.clone()),
         );
 
         Ok(next_id)
@@ -196,6 +202,16 @@ impl OrgRegistryContract {
 
             org.employee_count += 1;
             Self::write_org(&env, &org);
+
+            env.events().publish(
+                (Symbol::new(&env, "EmployeeAdded"),),
+                (
+                    org_id,
+                    record.address.clone(),
+                    record.display_name.clone(),
+                    record.role.clone(),
+                ),
+            );
         }
 
         Ok(())
@@ -223,6 +239,11 @@ impl OrgRegistryContract {
 
             org.employee_count = org.employee_count.saturating_sub(1);
             Self::write_org(&env, &org);
+
+            env.events().publish(
+                (Symbol::new(&env, "EmployeeRemoved"),),
+                (org_id, employee.clone()),
+            );
         }
 
         if let Some(payroll_contract) = env
@@ -231,11 +252,7 @@ impl OrgRegistryContract {
             .get::<_, Address>(&DataKey::PayrollContract)
         {
             let client = PayrollClient::new(&env, &payroll_contract);
-            let _ = client.try_remove_schedule(
-                &org_id,
-                &employee,
-                &env.current_contract_address(),
-            );
+            let _ = client.try_remove_schedule(&org_id, &employee, &env.current_contract_address());
         }
 
         Ok(())

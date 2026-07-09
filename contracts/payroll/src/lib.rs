@@ -1,7 +1,8 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contractclient, contracterror, contractimpl, contracttype, token, Address, Env, Vec,
+    contract, contractclient, contracterror, contractimpl, contracttype, token, Address, Env,
+    Symbol, Vec,
 };
 
 /// Ledgers to extend persistent entries by on every write (~30 days at 5s/ledger).
@@ -116,12 +117,19 @@ pub struct PayrollContract;
 #[contractimpl]
 impl PayrollContract {
     pub fn __constructor(env: Env, org_registry: Address, token: Address) {
-        env.storage().instance().set(&DataKey::OrgRegistry, &org_registry);
+        env.storage()
+            .instance()
+            .set(&DataKey::OrgRegistry, &org_registry);
         env.storage().instance().set(&DataKey::Token, &token);
     }
 
     /// Transfers USDC from caller to contract. Increases org's on-chain balance.
-    pub fn fund_payroll(env: Env, org_id: u64, funder: Address, amount: i128) -> Result<(), PayrollError> {
+    pub fn fund_payroll(
+        env: Env,
+        org_id: u64,
+        funder: Address,
+        amount: i128,
+    ) -> Result<(), PayrollError> {
         funder.require_auth();
 
         let token_client = token::Client::new(&env, &Self::token(&env));
@@ -130,6 +138,12 @@ impl PayrollContract {
         let mut config = Self::read_or_init_config(&env, org_id);
         config.usdc_balance += amount;
         Self::write_config(&env, &config);
+
+        env.events().publish(
+            (Symbol::new(&env, "PayrollFunded"),),
+            (org_id, funder, amount, config.usdc_balance),
+        );
+
         Ok(())
     }
 
@@ -186,12 +200,17 @@ impl PayrollContract {
                 .persistent()
                 .get(&list_key)
                 .unwrap_or_else(|| Vec::new(&env));
-            list.push_back(employee);
+            list.push_back(employee.clone());
             env.storage().persistent().set(&list_key, &list);
             env.storage()
                 .persistent()
                 .extend_ttl(&list_key, TTL_THRESHOLD, TTL_EXTEND_TO);
         }
+
+        env.events().publish(
+            (Symbol::new(&env, "ScheduleAdded"),),
+            (org_id, employee, amount, frequency),
+        );
 
         Ok(())
     }
@@ -306,10 +325,15 @@ impl PayrollContract {
     }
 
     /// Records signer approval. If threshold met, auto-executes.
-    pub fn approve_batch(env: Env, org_id: u64, batch_id: u64, signer: Address) -> Result<(), PayrollError> {
+    pub fn approve_batch(
+        env: Env,
+        org_id: u64,
+        batch_id: u64,
+        signer: Address,
+    ) -> Result<(), PayrollError> {
         signer.require_auth();
-        let is_signer = OrgRegistryClient::new(&env, &Self::org_registry(&env))
-            .is_signer(&org_id, &signer);
+        let is_signer =
+            OrgRegistryClient::new(&env, &Self::org_registry(&env)).is_signer(&org_id, &signer);
         if !is_signer {
             return Err(PayrollError::NotAuthorized);
         }
@@ -361,7 +385,8 @@ impl PayrollContract {
             }
 
             for split in schedule.splits.iter() {
-                let split_amount = schedule.amount * (split.percentage as i128) / (BPS_DENOMINATOR as i128);
+                let split_amount =
+                    schedule.amount * (split.percentage as i128) / (BPS_DENOMINATOR as i128);
                 if split_amount > 0 {
                     token_client.transfer(&contract_address, &split.destination, &split_amount);
                 }
@@ -372,6 +397,11 @@ impl PayrollContract {
             schedule.last_paid_at = now;
             schedule.next_payment_at = now + schedule.frequency.period_seconds();
             Self::write_schedule(&env, org_id, &schedule);
+
+            env.events().publish(
+                (Symbol::new(&env, "EmployeePaid"),),
+                (org_id, employee, schedule.amount),
+            );
         }
 
         config.usdc_balance -= total_disbursed;
@@ -380,12 +410,22 @@ impl PayrollContract {
         batch.executed = true;
         Self::write_batch(&env, org_id, &batch);
 
+        env.events().publish(
+            (Symbol::new(&env, "PayrollExecuted"),),
+            (org_id, batch_id, total_disbursed, batch.employee_count),
+        );
+
         Ok(())
     }
 
     /// Withdraws unfunded USDC back to admin wallet. Cannot withdraw below
     /// amount needed for next pay cycle.
-    pub fn withdraw_funds(env: Env, org_id: u64, amount: i128, caller: Address) -> Result<(), PayrollError> {
+    pub fn withdraw_funds(
+        env: Env,
+        org_id: u64,
+        amount: i128,
+        caller: Address,
+    ) -> Result<(), PayrollError> {
         caller.require_auth();
         Self::require_admin(&env, org_id, &caller)?;
 
@@ -421,7 +461,11 @@ impl PayrollContract {
     }
 
     /// Read-only.
-    pub fn get_schedule(env: Env, org_id: u64, employee: Address) -> Result<PaymentSchedule, PayrollError> {
+    pub fn get_schedule(
+        env: Env,
+        org_id: u64,
+        employee: Address,
+    ) -> Result<PaymentSchedule, PayrollError> {
         Self::read_schedule(&env, org_id, &employee)
     }
 
@@ -436,8 +480,8 @@ impl PayrollContract {
     }
 
     fn require_admin(env: &Env, org_id: u64, caller: &Address) -> Result<(), PayrollError> {
-        let is_admin = OrgRegistryClient::new(env, &Self::org_registry(env))
-            .is_admin(&org_id, caller);
+        let is_admin =
+            OrgRegistryClient::new(env, &Self::org_registry(env)).is_admin(&org_id, caller);
         if is_admin {
             Ok(())
         } else {
@@ -503,7 +547,11 @@ impl PayrollContract {
             .extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
     }
 
-    fn read_schedule(env: &Env, org_id: u64, employee: &Address) -> Result<PaymentSchedule, PayrollError> {
+    fn read_schedule(
+        env: &Env,
+        org_id: u64,
+        employee: &Address,
+    ) -> Result<PaymentSchedule, PayrollError> {
         env.storage()
             .persistent()
             .get(&DataKey::Schedule(org_id, employee.clone()))

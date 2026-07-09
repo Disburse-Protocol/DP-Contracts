@@ -1,4 +1,11 @@
 #![no_std]
+// create_grant's 7 params (env, org_id, employee, token, amount, cliff_seconds,
+// vesting_seconds, caller) mirror the on-chain VestingGrant fields one-to-one;
+// splitting them into a struct would just move the field list, not shrink it.
+// The lint also fires on the `#[contractimpl]`/`#[contractclient]`-generated
+// client code for this function, which an attribute on the impl block alone
+// doesn't reach, hence the crate-level allow.
+#![allow(clippy::too_many_arguments)]
 
 use soroban_sdk::{
     contract, contractclient, contracterror, contractimpl, contracttype, token, Address, Env, Vec,
@@ -29,8 +36,8 @@ pub struct VestingGrant {
 pub enum DataKey {
     OrgRegistry,
     NextGrantId,
-    Grant(u64),                       // grant_id -> VestingGrant
-    EmployeeGrants(u64, Address),     // (org_id, employee) -> Vec<u64>
+    Grant(u64),                   // grant_id -> VestingGrant
+    EmployeeGrants(u64, Address), // (org_id, employee) -> Vec<u64>
 }
 
 #[contracterror]
@@ -57,7 +64,9 @@ pub struct VestingContract;
 #[contractimpl]
 impl VestingContract {
     pub fn __constructor(env: Env, org_registry: Address) {
-        env.storage().instance().set(&DataKey::OrgRegistry, &org_registry);
+        env.storage()
+            .instance()
+            .set(&DataKey::OrgRegistry, &org_registry);
     }
 
     /// Transfers tokens from admin to contract. Creates grant.
@@ -72,8 +81,8 @@ impl VestingContract {
         caller: Address,
     ) -> Result<u64, VestingError> {
         caller.require_auth();
-        let is_admin = OrgRegistryClient::new(&env, &Self::org_registry(&env))
-            .is_admin(&org_id, &caller);
+        let is_admin =
+            OrgRegistryClient::new(&env, &Self::org_registry(&env)).is_admin(&org_id, &caller);
         if !is_admin {
             return Err(VestingError::NotAuthorized);
         }
@@ -87,7 +96,9 @@ impl VestingContract {
             .get(&DataKey::NextGrantId)
             .unwrap_or(0)
             + 1;
-        env.storage().instance().set(&DataKey::NextGrantId, &grant_id);
+        env.storage()
+            .instance()
+            .set(&DataKey::NextGrantId, &grant_id);
 
         let grant = VestingGrant {
             grant_id,
@@ -205,7 +216,11 @@ impl VestingContract {
 
         let mut grants = Vec::new(&env);
         for id in ids.iter() {
-            if let Some(grant) = env.storage().persistent().get::<_, VestingGrant>(&DataKey::Grant(id)) {
+            if let Some(grant) = env
+                .storage()
+                .persistent()
+                .get::<_, VestingGrant>(&DataKey::Grant(id))
+            {
                 grants.push_back(grant);
             }
         }
@@ -213,11 +228,7 @@ impl VestingContract {
     }
 
     fn vested_amount(grant: &VestingGrant, now: u64) -> i128 {
-        let effective_now = if grant.revoked {
-            grant.revoked_at
-        } else {
-            now
-        };
+        let effective_now = if grant.revoked { grant.revoked_at } else { now };
 
         if effective_now < grant.start_at + grant.cliff_seconds {
             return 0;

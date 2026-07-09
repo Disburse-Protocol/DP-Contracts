@@ -1,0 +1,46 @@
+name: Verified Release
+
+# Reproducibly builds each contract and publishes it as a GitHub Release via
+# stellar-expert/soroban-build-workflow. Deploying from that release's WASM
+# artifact (see scripts/deploy.sh) is what lets stellar.expert show the
+# deployed contract as "verified" and link back to this source.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  id-token: write
+  contents: write
+  attestations: write
+
+jobs:
+  release-org-registry:
+    uses: stellar-expert/soroban-build-workflow/.github/workflows/release.yml@main
+    with:
+      release_name: ${{ github.ref_name }}
+      release_description: "Org Registry contract — organizations, employees, signer roles"
+      relative_path: '["contracts/org-registry"]'
+      package: "org-registry"
+    secrets:
+      release_token: ${{ secrets.GITHUB_TOKEN }}
+
+  release-payroll:
+    uses: stellar-expert/soroban-build-workflow/.github/workflows/release.yml@main
+    with:
+      release_name: ${{ github.ref_name }}
+      release_description: "Payroll contract — schedules, splits, multi-sig disbursement"
+      relative_path: '["contracts/payroll"]'
+      package: "payroll"
+    secrets:
+      release_token: ${{ secrets.GITHUB_TOKEN }}
+
+  release-vesting:
+    uses: stellar-expert/soroban-build-workflow/.github/workflows/release.yml@main
+    with:
+      release_name: ${{ github.ref_name }}
+      release_description: "Vesting contract — cliff + linear token grants"
+      relative_path: '["contracts/vesting"]'
+      package: "vesting"
+    secrets:
+      release_token: ${{ secrets.GITHUB_TOKEN }}
